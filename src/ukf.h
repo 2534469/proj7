@@ -18,6 +18,7 @@ private:
    MatrixXd R_laser_;
    MatrixXd R_radar_;
    MatrixXd Xsig_aug;
+   void _normalize_angle(VectorXd &vector, int idx);
 
 public:
 
