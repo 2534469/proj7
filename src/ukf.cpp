@@ -27,10 +27,10 @@ UKF::UKF() {
   P_ = MatrixXd(n_x_, n_x_);
   
   // Process noise standard deviation longitudinal acceleration in m/s^2
-    std_a_ = 0.2;//1; //change 6 m/s^2 => 3^2 for vehicle -> 2 => 1 => 1  for bike
+    std_a_ = 3;//1.5;//1.2;//1; //change 6 m/s^2 => 3^2 for vehicle -> 2 => 1 => 1  for bike 0.2
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-    std_yawdd_ = 0.4;//0.5 * M_PI;//change 0.2
+    std_yawdd_ = 1;//0.4;//0.5;//0.5 * M_PI;//change 0.2 0.4
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -40,13 +40,13 @@ UKF::UKF() {
   std_laspy_ = 0.15;
 
   // Radar measurement noise standard deviation radius in m
-  std_radr_ = 0.3;
+  std_radr_ = 0.3; //0.3
 
   // Radar measurement noise standard deviation angle in rad
   std_radphi_ = 0.03;
 
   // Radar measurement noise standard deviation radius change in m/s
-  std_radrd_ = 0.3;
+  std_radrd_ = 0.3; //0.3
   //DO NOT MODIFY measurement noise values above these are provided by the sensor manufacturer.
   
   
@@ -109,8 +109,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
         // first measurement
         
         float bike_speed_avg = 6.9; //m/s = 25 km/h = 6,9 m/s
-        x_ <<  0,0,bike_speed_avg/2,0,0;
-        
+       // x_ <<  0,0,bike_speed_avg/2,0,0;
+        //x_ <<  0,0,1,1,0.1;
+       //  x_ <<  0,0,bike_speed_avg/2,1,0.1;
+       //  x_ <<  0,0,1,1,0.1;
+        x_ <<  0,0,0,0,0;
         MatrixXd P_ = MatrixXd(5, 5);
         /*P_ << 1,0,0,0,0, //0.15*0.15 , 1
               0,1,0,0,0, //0.15*0.15
@@ -123,7 +126,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
         0, 0, 0, 1, 0,
         0, 0, 0, 0, 1;
         
-        if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_laser_) {
+        if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_) {
             /**
              Convert radar from polar to cartesian coordinates and initialize state.
              */
@@ -132,10 +135,10 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
             double rho_dot = meas_package.raw_measurements_(2);
             double vx = rho_dot * cos(meas_package.raw_measurements_(1));
             double vy = rho_dot * sin(meas_package.raw_measurements_(1));
-            x_(2) = sqrt(vx * vx + vy * vy);
+            //x_(2) = sqrt(vx * vx + vy * vy);
 
         }
-        else if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_radar_) {
+        else if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_) {
             x_(0) = meas_package.raw_measurements_(0);
             x_(1) = meas_package.raw_measurements_(1);
 
@@ -150,11 +153,13 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     
     //prediction
     float delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
+    
     Prediction(delta_t);
     
-    if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_) {
         UpdateRadar(meas_package);
-    } else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+    } else if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_) {
         UpdateLidar(meas_package);
     }
     time_us_ = meas_package.timestamp_;
@@ -294,6 +299,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
     cout << "nis for lidar (limit 5.99)," << nis << endl;
 }
 
+
+
 /**
  * Updates the state and the state covariance matrix using a radar measurement.
  * @param {MeasurementPackage} meas_package
@@ -316,13 +323,14 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
         
         // measurement model
         Zsig(0,i) = sqrt(p_x*p_x + p_y*p_y);                        //r
-        //if (p_x == 0.0 && p_y == 0.0)
-        //    return;
+
         Zsig(1,i) = atan2(p_y,p_x);//phi
-        //if (sqrt(p_x*p_x + p_y*p_y) < 0.001) {
-        //    Zsig(2,i) = (p_x*v1 + p_y*v2 ) / sqrt(p_x*p_x + p_y*p_y);
-        //} else {
-        Zsig(2,i) = (p_x*v1 + p_y*v2 ) / sqrt(p_x*p_x + p_y*p_y);   //r_dot
+        //Zsig(2,i) = (p_x*v1 + p_y*v2 ) / sqrt(p_x*p_x + p_y*p_y);//r_dot
+        if (sqrt(p_x*p_x + p_y*p_y) < 0.001) {
+            Zsig(2,i) = (p_x*v1 + p_y*v2 ) / 0.001;
+        } else {
+            Zsig(2,i) = (p_x*v1 + p_y*v2 ) / sqrt(p_x*p_x + p_y*p_y);//r_dot
+        }
     }
     
     //mean predicted measurement
